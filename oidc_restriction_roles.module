@@ -1,0 +1,71 @@
+<?php
+
+use Drupal\Core\Session\AccountInterface;
+use Drupal\oidc\OpenidConnectSession;
+
+/**
+ * Implémentation de hook_user_login().
+ *
+ * Vérifie si l'utilisateur appartient à la bonne section en fonction du layer_group_id.
+ */
+function oidc_restriction_roles_user_login(AccountInterface $account) {
+  // Vérifie si l'utilisateur est authentifié via OpenID Connect.
+  if ($account->isAuthenticated()) {
+    \Drupal::logger('oidc_restriction_roles')->notice('Utilisateur @uid est authentifié.', ['@uid' => $account->id()]);
+    
+    // Récupérer le service de session OIDC.
+    $oidc_session = \Drupal::service('oidc.openid_connect_session');
+    
+    // Récupérer les tokens JWT associés à l'utilisateur via la session OIDC.
+    $tokens = $oidc_session->getJsonWebTokens();
+    
+    if ($tokens) {
+      \Drupal::logger('oidc_restriction_roles')->notice('Tokens JWT récupérés pour l\'utilisateur @uid.', ['@uid' => $account->id()]);
+      
+      // Décoder le JWT pour accéder aux claims.
+      $claims = $tokens->getClaims();
+      
+      // Vérifier si le claim 'layer_group_id' est présent.
+      if (isset($claims['roles'][0]['layer_group_id'])) {
+        $layer_group_id = $claims['roles'][0]['layer_group_id']; // Récupère l'ID du groupe de la section.
+        \Drupal::logger('oidc_restriction_roles')->notice('layer_group_id trouvé : @layer_group_id', ['@layer_group_id' => $layer_group_id]);
+
+        // Récupérer la configuration définie dans la page admin.
+        $config = \Drupal::config('oidc_restriction_roles.settings');
+        $allowed_section = $config->get('section_id') ?: '2050';
+        $role_name = $config->get('role_name') ?: 'membres';
+
+        // Comparer avec l'ID de la section autorisée.
+        if ($layer_group_id == $allowed_section) {
+          // L'utilisateur appartient à la section
+          if (!$account->hasRole($role_name)) {
+            $account->addRole($role_name);
+            $account->save();
+            \Drupal::messenger()->addStatus(t('Vous avez été ajouté au groupe "@role".', ['@role' => $role_name]));
+            \Drupal::logger('oidc_restriction_roles')->notice('Rôle "@role" ajouté pour l\'utilisateur @uid.', ['@role' => $role_name, '@uid' => $account->id()]);
+          }
+          else {
+            \Drupal::logger('oidc_restriction_roles')->notice('L\'utilisateur @uid a déjà le rôle "@role".', ['@uid' => $account->id(), '@role' => $role_name]);
+          }
+        }
+        else {
+          // L'utilisateur n'appartient pas à la section autorisée.
+          \Drupal::messenger()->addError(t('Vous n\'êtes pas membre de cette section et ne pouvez pas vous connecter.'));
+          user_logout();
+          \Drupal::logger('oidc_restriction_roles')->warning('Utilisateur @uid a tenté de se connecter mais n\'appartient pas à la section autorisée.', ['@uid' => $account->id()]);
+        }
+      }
+      else {
+        \Drupal::messenger()->addError(t('Erreur : les informations nécessaires pour se connecter ne sont pas disponibles.'));
+        user_logout();
+        \Drupal::logger('oidc_restriction_roles')->error('Utilisateur @uid n\'a pas les claims nécessaires.', ['@uid' => $account->id()]);
+      }
+    }
+    else {
+      \Drupal::logger('oidc_restriction_roles')->error('Aucun token JWT récupéré pour l\'utilisateur @uid.', ['@uid' => $account->id()]);
+    }
+  }
+  else {
+    \Drupal::logger('oidc_restriction_roles')->warning('Tentative de connexion par un utilisateur non authentifié.');
+  }
+}

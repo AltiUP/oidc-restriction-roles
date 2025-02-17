@@ -1,0 +1,11 @@
+name: 'OpenID Connect Restriction & Roles'
+description: 'Restreint la connexion en fonction du layer_group_id OpenID Connect et ajoute un role'
+package: Authentication
+
+type: module
+core_version_requirement: ^9 || ^10
+
+dependencies:
+  - oidc:oidc
+
+version: '2.0.0'

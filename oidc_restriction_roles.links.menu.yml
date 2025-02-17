@@ -1,0 +1,6 @@
+oidc_restriction_roles.settings:
+  title: 'OIDC Restrictions'
+  description: 'Configurez le rôle et la section autorisée pour les connexions OIDC.'
+  parent: user.admin_index
+  route_name: oidc_restriction_roles.settings
+  weight: 100

@@ -1,0 +1,7 @@
+oidc_restriction_roles.settings:
+  path: '/admin/config/people/oidc-restriction-roles'
+  defaults:
+    _form: '\Drupal\oidc_restriction_roles\Form\OidcRestrictionRolesSettingsForm'
+    _title: 'Configuration des restrictions OIDC'
+  requirements:
+    _permission: 'administer site configuration'
