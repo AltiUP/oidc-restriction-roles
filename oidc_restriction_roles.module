@@ -25,18 +25,22 @@ function oidc_restriction_roles_user_login(AccountInterface $account) {
       // Décoder le JWT pour accéder aux claims.
       $claims = $tokens->getClaims();
       
-      // Vérifier si le claim 'layer_group_id' est présent.
-      if (isset($claims['roles'][0]['layer_group_id'])) {
-        $layer_group_id = $claims['roles'][0]['layer_group_id']; // Récupère l'ID du groupe de la section.
-        \Drupal::logger('oidc_restriction_roles')->notice('layer_group_id trouvé : @layer_group_id', ['@layer_group_id' => $layer_group_id]);
-
-        // Récupérer la configuration définie dans la page admin.
-        $config = \Drupal::config('oidc_restriction_roles.settings');
-        $allowed_section = $config->get('section_id') ?: '2050';
-        $role_name = $config->get('role_name') ?: 'membres';
-
-        // Comparer avec l'ID de la section autorisée.
-        if ($layer_group_id == $allowed_section) {
+      // Récupérer la configuration définie dans la page admin.
+      $config = \Drupal::config('oidc_restriction_roles.settings');
+      $allowed_section = $config->get('section_id') ?: '2050';
+      $role_name = $config->get('role_name') ?: 'membres';
+      
+      // Vérifier si le claim 'roles' est présent et contient des layer_group_id.
+      if (isset($claims['roles']) && is_array($claims['roles'])) {
+        $allowed = false;
+        foreach ($claims['roles'] as $role) {
+          if (isset($role['layer_group_id']) && $role['layer_group_id'] == $allowed_section) {
+            $allowed = true;
+            break;
+          }
+        }
+        
+        if ($allowed) {
           // L'utilisateur appartient à la section
           if (!$account->hasRole($role_name)) {
             $account->addRole($role_name);
